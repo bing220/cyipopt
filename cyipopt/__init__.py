@@ -9,6 +9,13 @@ Copyright (C) 2017-2024 cyipopt developers
 License: EPL 2.0
 """
 
+import sys
+if sys.platform == 'win32':
+    import os
+    extra_dll_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lib')  
+    if os.path.isdir(extra_dll_dir):  
+        os.add_dll_directory(extra_dll_dir)
+
 from ipopt_wrapper import *
 from .ipopt_wrapper import *
 from .scipy_interface import *

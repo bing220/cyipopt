@@ -13,6 +13,7 @@ import sys
 import os.path
 from distutils.sysconfig import get_python_lib
 import subprocess as sp
+import shutil 
 
 from setuptools import setup
 from setuptools.extension import Extension
@@ -139,28 +140,39 @@ def handle_ext_modules_win_32_other_ipopt():
 
     # These are the specific binaries in the IPOPT 3.13.2 binary download:
     # https://github.com/coin-or/Ipopt/releases/download/releases%2F3.13.2/Ipopt-3.13.2-win64-msvs2019-md.zip
-    IPOPT_LIBS = ["ipopt.dll", "ipoptamplinterface.dll"]
-    IPOPT_LIB_DIRS = [os.path.join(ipoptdir, "lib")]
+    IPOPT_LIBS = ["ipopt"]
+    IPOPT_LIB_DIRS = [os.path.join(ipoptdir, "lib")]     
 
+    IPOPT_BIN_DIR = os.path.join(ipoptdir, "bin")
     IPOPT_DLL = [
-        "ipopt-3.dll",
-        "ipoptamplinterface-3.dll",
-        "libifcoremd.dll",
-        "libmmd.dll",
-        "msvcp140.dll",
-        "svml_dispmd.dll",
-        "vcruntime140.dll",
-    ]
+        "ipopt.dll",
+        "libdmumps.dll",
+        "libopenblas.dll",
+        "libgcc_s_seh-1.dll",
+        "libgfortran-5.dll",
+        "libquadmath-0.dll",
+        "libwinpthread-1.dll",         
+    ]    
     IPOPT_DLL_DIRS = [os.path.join(ipoptdir, "bin")]
     EXT_MODULES = [Extension("ipopt_wrapper",
                              ["cyipopt/cython/ipopt_wrapper.pyx"],
                              include_dirs=IPOPT_INCLUDE_DIRS,
                              libraries=IPOPT_LIBS,
                              library_dirs=IPOPT_LIB_DIRS)]
-    DATA_FILES = [(get_python_lib(),
-                  [os.path.join(IPOPT_DLL_DIRS[0], dll)
-                   for dll in IPOPT_DLL])] if IPOPT_DLL else None
-    include_package_data = False
+    #DATA_FILES = [(get_python_lib(),
+    #              [os.path.join(IPOPT_DLL_DIRS[0], dll)
+    #               for dll in IPOPT_DLL])] if IPOPT_DLL else None
+    
+    DLL_FILES = [os.path.join(IPOPT_BIN_DIR, dll) for dll in IPOPT_DLL]    
+    libpath = os.path.join("cyipopt","lib")
+    if not os.path.exists(libpath):
+        os.makedirs(libpath)
+
+    for file in DLL_FILES:
+        shutil.copy(file, libpath)
+        
+    DATA_FILES = None    
+    include_package_data = True
     return EXT_MODULES, DATA_FILES, include_package_data
 
 
@@ -186,17 +198,21 @@ if __name__ == "__main__":
     if sys.platform == "win32" and ipoptdir == "USECONDAFORGEIPOPT":
         print('Using Conda Forge Ipopt on Windows.')
         ext_module_data = handle_ext_modules_win_32_conda_forge_ipopt()
+        package_data = {}                         
     elif sys.platform == "win32" and ipoptdir:
         print('Using Ipopt in {} directory on Windows.'.format(ipoptdir))
         ext_module_data = handle_ext_modules_win_32_other_ipopt()
+        package_data = {'cyipopt': ['lib/*.dll']}
     elif sys.platform == "win32" and not ipoptdir:
         ipoptdir = os.path.abspath(os.path.dirname(__file__))
         msg = 'Using Ipopt adjacent to setup.py in {} on Windows.'
         print(msg.format(ipoptdir))
         ext_module_data = handle_ext_modules_win_32_other_ipopt()
+        package_data = {}
     else:
         print('Using Ipopt found with pkg-config.')
         ext_module_data = handle_ext_modules_general_os()
+        package_data = {}
     EXT_MODULES, DATA_FILES, include_package_data = ext_module_data
     # NOTE : The `name` kwarg here is the distribution name, i.e. the name that
     # PyPi uses for a collection of packages. Historically this has been
@@ -218,7 +234,7 @@ if __name__ == "__main__":
           setup_requires=SETUP_REQUIRES,
           install_requires=INSTALL_REQUIRES,
           include_package_data=include_package_data,
-          data_files=DATA_FILES,
+          package_data=package_data,
           zip_safe=False,  # required for Py27 on Windows to work
           cmdclass={"build_ext": build_ext},
           ext_modules=EXT_MODULES,
